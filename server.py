@@ -6,6 +6,7 @@ import datetime
 import json
 import functools
 import urllib
+from http.server import HTTPServer, SimpleHTTPRequestHandler, test
 #----------------------------------------------------------------------
 
 def get_items_from_url(url, fn):
@@ -137,7 +138,7 @@ dist = {
     }
 states_map = {}
 for k, v in dist.items():
-    states_map[v] = 0
+    states_map[v] = k
 today=datetime.date.today()
 s = "" + str(today.month) + "-" + str(today.day).rjust(2,'0') + "-" + str(today.year)
 # print(s)
@@ -183,16 +184,17 @@ for file_name in file_list:
     else:
         tests = "People_Tested"
     csv_data = csv_data[["Province_State", tests, "Confirmed"]]
-    
+    csv_data = csv_data.fillna(0)
+
     for index, row in csv_data.iterrows():
-        map_parsed["Province_State"] = row["Province_State"]
         map_parsed[tests] = row[tests]
         map_parsed["Confirmed"] = row["Confirmed"]
-        state = map_parsed["Province_State"]
+        state = row["Province_State"]
         if state in states_map.keys():
-            day_map[state] = map_parsed
+            day_map[states_map[state]] = map_parsed
         map_parsed = {}
     data_2021[int(month)-1][int(day)-1] = day_map
+    day_map = {}
 
 day_map = {}
 for file_name in file_list:
@@ -207,16 +209,17 @@ for file_name in file_list:
     else:
         tests = "People_Tested"
     csv_data = csv_data[["Province_State", tests, "Confirmed"]]
-    
+    csv_data = csv_data.fillna(0)
+
     for index, row in csv_data.iterrows():
-        map_parsed["Province_State"] = row["Province_State"]
         map_parsed[tests] = row[tests]
         map_parsed["Confirmed"] = row["Confirmed"]
-        state = map_parsed["Province_State"]
+        state = row["Province_State"]
         if state in states_map.keys():
-            day_map[state] = map_parsed
+            day_map[states_map[state]] = map_parsed
         map_parsed = {}
     data_2020[int(month)-1][int(day)-1] = day_map
+    day_map = {}
 
 # for file_name in file_list:
 #         print(file_name)
@@ -237,8 +240,10 @@ for file_name in file_list:
     
 result.set_index("Province_State", inplace=True, drop=False) 
 
-class RequestHandler(http.server.BaseHTTPRequestHandler):
-    '''处理请求并返回页面'''
+class CORSRequestHandler (SimpleHTTPRequestHandler):
+    def end_headers (self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        SimpleHTTPRequestHandler.end_headers(self)
 
     def get_whole(self, state):
         self.send_response(200)
@@ -248,9 +253,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         # today_result = period_result.to_json(orient="index")
         # parsed = json.loads(today_result)
 
-        res = {}
-        res['2020'] = data_2020
-        res['2021'] = data_2021
+        res = {'2020':data_2020,'2021':data_2021}  
         self.wfile.write(json.dumps(res, indent=4).encode())
 
 
@@ -340,10 +343,10 @@ if __name__ == '__main__':
     print("*****************")
     print(data_2020)
     # print(result)
-    host = ('', 8888)
+    host = ('192.168.1.72', 8888)
     # # serverAddress = ('', 8080)
     # # http://localhost:8888/
     print("sever start")
-    server = http.server.HTTPServer(host, RequestHandler)
+    server = http.server.HTTPServer(host, CORSRequestHandler)
     server.serve_forever()
     
